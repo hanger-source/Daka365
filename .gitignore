@@ -1,0 +1,20 @@
+# 忽略所有的 Excel 文件
+*.xlsx
+
+# 忽略备份脚本
+*bak*.py
+
+# 忽略 Python 缓存
+__pycache__/
+*.pyc
+
+# 忽略虚拟环境（如果存在）
+.venv/
+venv/
+env/
+
+# 忽略 IDE 配置
+.idea/
+.vscode/
+.cursor/
+
