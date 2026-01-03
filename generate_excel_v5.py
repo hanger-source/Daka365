@@ -86,6 +86,8 @@ class HabitTrackerGenerator:
                 cell = ws.cell(row=r, column=c); cell.protection = Protection(locked=False)
                 cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=(c==3))
                 if c == 1: cell.value = f'=IF(C{r}<>"", ROW()-1, "")'
+                # 积极标志列（E列）字体调大
+                if c == 5: cell.font = Font(size=20)
 
         ws.column_dimensions['A'].width = 8; ws.column_dimensions['B'].width = 12; ws.column_dimensions['C'].width = 45; ws.column_dimensions['D'].width = 15; ws.column_dimensions['E'].width = 15
         
@@ -154,7 +156,7 @@ class HabitTrackerGenerator:
             if c <= self.col_offset: continue 
             adj_c = c - self.col_offset
             if (adj_c-1) % block_width == 0: ws.column_dimensions[col_let].width = 8 
-            elif (adj_c-1) % block_width < 32: ws.column_dimensions[col_let].width = 4.5 
+            elif (adj_c-1) % block_width < 32: ws.column_dimensions[col_let].width = 4.5 # 进一步微调列宽
             else: ws.column_dimensions[col_let].width = 6 
 
         for i in range(self.max_items):
@@ -172,21 +174,23 @@ class HabitTrackerGenerator:
                 cell.fill = h_fill; cell.border = c_border; cell.alignment = Alignment(horizontal='center', vertical='center')
 
             for m in range(1, 13):
-                r = row_idx + 1 + m; ws.row_dimensions[r].height = 30 
+                r = row_idx + 1 + m; ws.row_dimensions[r].height = 22.5 # 微调行高为 22.5，保持正方形比例
                 ws.cell(row=r, column=col_idx, value=f"{m}月").fill = h_fill; ws.cell(row=r, column=col_idx).border = c_border; ws.cell(row=r, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
                 m_name = f"{self.year}年{m}月打卡"; num_days = calendar.monthrange(self.year, m)[1]
                 for d in range(1, 32):
                     curr_c = col_idx + d
                     if d <= num_days:
-                        # 引用月度表中 M 列以后的每日打卡数据 (偏移量从 11 变为 12)
+                        # 引用月度表中 M 列以后的每日打卡数据
                         formula = f'=IF(事项配置页!$C${cfg_r}="", "", IF(\'{m_name}\'!{get_column_letter(d + 12)}{16 + i}<>"", \'{m_name}\'!{get_column_letter(d + 12)}{16 + i}, ""))'
-                        ws.cell(row=r, column=curr_c, value=formula).alignment = Alignment(horizontal='center', vertical='center')
+                        cell = ws.cell(row=r, column=curr_c, value=formula)
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                        cell.font = Font(size=11) # 字体适配 22.5 行高
                     else:
                         ws.cell(row=r, column=curr_c).fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
                     ws.cell(row=r, column=curr_c).border = c_border
 
             heat_range = f"{get_column_letter(col_idx+1)}{row_idx+2}:{get_column_letter(col_idx+31)}{row_idx+13}"
-            ws.conditional_formatting.add(heat_range, FormulaRule(formula=[f'AND({get_column_letter(col_idx+1)}{row_idx+2}<>"", {get_column_letter(col_idx+1)}{row_idx+2}<>0)'], fill=self.theme.get_fill(self.theme.SUCCESS_BG_COLOR), font=Font(color=self.theme.SUCCESS_TEXT_COLOR, bold=True), border=c_border))
+            ws.conditional_formatting.add(heat_range, FormulaRule(formula=[f'AND({get_column_letter(col_idx+1)}{row_idx+2}<>"", {get_column_letter(col_idx+1)}{row_idx+2}<>0)'], fill=self.theme.get_fill(self.theme.SUCCESS_BG_COLOR), font=Font(color=self.theme.SUCCESS_TEXT_COLOR, bold=True, size=11), border=c_border))
 
     def _setup_monthly_sheets(self):
         for month_num in range(1, 13):
@@ -289,7 +293,11 @@ class HabitTrackerGenerator:
                         if month_num > 1: prev = f"{self.year}年{month_num-1}月打卡"; cell.value = f'=IF(E{row}<>"", IFERROR((J{row}-\'{prev}\'!J{row})/\'{prev}\'!J{row}, 0), "")'
                         else: cell.value = f'=IF(E{row}<>"", 0, "")'
                         cell.number_format = '0.0%'
-                for d in range(1, num_days+1): ws.cell(row=row, column=d+10+self.col_offset).protection = Protection(locked=False); ws.cell(row=row, column=d+10+self.col_offset).alignment = Alignment(horizontal='center', vertical='center')
+                for d in range(1, num_days+1): 
+                    c = ws.cell(row=row, column=d+10+self.col_offset)
+                    c.protection = Protection(locked=False)
+                    c.alignment = Alignment(horizontal='center', vertical='center')
+                    c.font = Font(size=20)
 
             end_let = get_column_letter(num_days+10+self.col_offset); start_r, end_r = self.main_table_start, self.main_table_start + self.max_items - 1
             rate_rule = ColorScaleRule(start_type='num', start_value=0, start_color=self.theme.SCALE_RED, mid_type='num', mid_value=0.5, mid_color=self.theme.SCALE_YELLOW, end_type='num', end_value=1, end_color=self.theme.SCALE_GREEN)
@@ -303,7 +311,7 @@ class HabitTrackerGenerator:
             ws.conditional_formatting.add(f"{dash_heat_let}{stat_row+4}:{dash_heat_end}{stat_row+4}", rate_rule)
             ws.conditional_formatting.add(f"{dash_heat_let}{stat_row+5}:{dash_heat_end}{stat_row+6}", growth_rule)
             ws.conditional_formatting.add(f"G{start_r}:G{end_r}", rate_rule); ws.conditional_formatting.add(f"J{start_r}:J{end_r}", rate_rule); ws.conditional_formatting.add(f"K{start_r}:L{end_r}", growth_rule)
-            ws.conditional_formatting.add(f"M{start_r}:{end_let}{end_r}", FormulaRule(formula=[f'LEN(TRIM(M{start_r}))>0'], fill=self.theme.get_fill(self.theme.SUCCESS_BG_COLOR), font=Font(color=self.theme.SUCCESS_TEXT_COLOR, bold=True), border=c_border, stopIfTrue=True))
+            ws.conditional_formatting.add(f"M{start_r}:{end_let}{end_r}", FormulaRule(formula=[f'LEN(TRIM(M{start_r}))>0'], fill=self.theme.get_fill(self.theme.SUCCESS_BG_COLOR), font=Font(color=self.theme.SUCCESS_TEXT_COLOR, bold=True, size=20), border=c_border, stopIfTrue=True))
             zebra_ranges = f"C{start_r}:F{end_r} H{start_r}:J{end_r} M{start_r}:{end_let}{end_r}"
             ws.conditional_formatting.add(zebra_ranges, FormulaRule(formula=[f'MOD(ROW()-{start_r},2)=1'], fill=self.theme.get_fill(self.theme.ZEBRA_COLOR)))
             ws.conditional_formatting.add(f"C{start_r}:{end_let}{end_r}", FormulaRule(formula=[f'$E{start_r}<>""'], border=c_border))
